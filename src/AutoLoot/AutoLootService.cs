@@ -15,9 +15,8 @@ internal sealed class AutoLootService
     private DateTime lastPickupAttemptUtc = DateTime.MinValue;
     private IReadOnlyList<GroundLootCandidate> lastCandidates = Array.Empty<GroundLootCandidate>();
     private GroundLootScanDiagnostics lastDiagnostics = new();
-    private DateTime lastFilterWarningUtc = DateTime.MinValue;
-    private uint? lastTargetEntityId;
     private bool pricesInitialized;
+    private int debugOverlayFrame;
 
     public int PickupAttempts { get; private set; }
 
@@ -31,7 +30,7 @@ internal sealed class AutoLootService
 
     public GroundLootScanDiagnostics LastDiagnostics => lastDiagnostics;
 
-    public void Initialize(string dllDirectory, string pluginsRoot, AutoLootSettings settings)
+    public void Initialize(string dllDirectory)
     {
         if (pricesInitialized)
         {
@@ -39,11 +38,11 @@ internal sealed class AutoLootService
         }
 
         prices.Initialize(dllDirectory);
-        prices.Reload(pluginsRoot, settings.NinjaLeague);
+        prices.RefreshPrices();
         pricesInitialized = true;
     }
 
-    public void ReloadPrices(string pluginsRoot, string league) => prices.Reload(pluginsRoot, league);
+    public void ReloadPrices() => prices.RefreshPrices();
 
     public void ResetStats()
     {
@@ -53,7 +52,6 @@ internal sealed class AutoLootService
         lastDiagnostics = new GroundLootScanDiagnostics();
         debugMarkers.Clear();
         clickTracker.Reset();
-        lastTargetEntityId = null;
         StatusMessage = "Idle";
     }
 
@@ -99,19 +97,10 @@ internal sealed class AutoLootService
         }
 
         var scanSettings = BuildScanSettings(settings);
+        var priceService = settings.UseValueFilter ? prices : null;
         if (clickTracker.ShouldWaitForPickup())
         {
             StatusMessage = "Waiting for pickup";
-            var waitDiagnostics = new GroundLootScanDiagnostics();
-            lastCandidates = GroundLootScanner.Scan(
-                inGame,
-                area,
-                scanSettings,
-                prices,
-                clickTracker.IsIgnored,
-                waitDiagnostics,
-                settings.ShowDebugOverlay ? debugMarkers : null);
-            lastDiagnostics = waitDiagnostics;
             return;
         }
 
@@ -120,19 +109,54 @@ internal sealed class AutoLootService
         {
             debugMarkers.Clear();
         }
-
-        lastCandidates = GroundLootScanner.Scan(
-            inGame,
-            area,
-            scanSettings,
-            prices,
-            clickTracker.IsIgnored,
-            diagnostics,
-            settings.ShowDebugOverlay ? debugMarkers : null);
-        lastDiagnostics = diagnostics;
-
-        if (lastCandidates.Count == 0)
+        else if (++debugOverlayFrame % 4 == 0)
         {
+            GroundLootScanner.Scan(
+                inGame,
+                area,
+                scanSettings,
+                priceService,
+                clickTracker.IsIgnored,
+                new GroundLootScanDiagnostics(),
+                debugMarkers);
+        }
+
+        GroundLootCandidate target;
+        if (settings.UseValueFilter)
+        {
+            lastCandidates = GroundLootScanner.Scan(
+                inGame,
+                area,
+                scanSettings,
+                priceService,
+                clickTracker.IsIgnored,
+                diagnostics,
+                markers: null);
+            lastDiagnostics = diagnostics;
+
+            if (lastCandidates.Count == 0)
+            {
+                StatusMessage = diagnostics.GroundEntities == 0
+                    ? $"No ground loot seen ({diagnostics.AwakeEntities} awake)"
+                    : diagnostics.FilteredByPath == diagnostics.GroundEntities
+                        ? $"All loot filtered ({diagnostics.GroundEntities} ground)"
+                        : $"No loot in range ({diagnostics.GroundEntities} ground, {diagnostics.OutOfRange} far)";
+                return;
+            }
+
+            target = lastCandidates.FirstOrDefault(static candidate => candidate.HasScreenPosition);
+        }
+        else if (!GroundLootScanner.TryFindPickupTarget(
+                     inGame,
+                     area,
+                     scanSettings,
+                     priceService,
+                     clickTracker.IsIgnored,
+                     diagnostics,
+                     out target))
+        {
+            lastCandidates = Array.Empty<GroundLootCandidate>();
+            lastDiagnostics = diagnostics;
             StatusMessage = diagnostics.GroundEntities == 0
                 ? $"No ground loot seen ({diagnostics.AwakeEntities} awake)"
                 : diagnostics.FilteredByPath == diagnostics.GroundEntities
@@ -140,11 +164,17 @@ internal sealed class AutoLootService
                     : $"No loot in range ({diagnostics.GroundEntities} ground, {diagnostics.OutOfRange} far)";
             return;
         }
+        else
+        {
+            lastCandidates = [target];
+            lastDiagnostics = diagnostics;
+        }
 
-        var target = PickNextTarget(lastCandidates);
         if (target == default || !target.HasScreenPosition)
         {
-            StatusMessage = $"Loot in range but off-screen ({lastCandidates.Count})";
+            StatusMessage = diagnostics.Clickable == 0
+                ? $"No loot in range ({diagnostics.GroundEntities} ground, {diagnostics.OutOfRange} far)"
+                : $"Loot in range but off-screen ({diagnostics.Clickable})";
             return;
         }
 
@@ -168,55 +198,34 @@ internal sealed class AutoLootService
 
         lastPickupAttemptUtc = DateTime.UtcNow;
         PickupAttempts++;
-        lastTargetEntityId = target.EntityId;
         clickTracker.BeginPickup(
             target.EntityId,
             (int)Math.Round(target.ClientPosition.X),
             (int)Math.Round(target.ClientPosition.Y),
             GroundLootRules.IsWorldItemPath(target.ItemPath));
 
+        var label = string.IsNullOrWhiteSpace(target.DisplayName)
+            ? LootPathMatcher.GetDisplayName(target.ItemPath)
+            : target.DisplayName;
+
         if (settings.EnableDebugLogging)
         {
             Log.Info(
-                $"click {target.DisplayName} @ ({screen.X:0},{screen.Y:0}) value={target.DivineValue:0.###} dist={target.Distance:0.#}",
+                $"click {label} @ ({screen.X:0},{screen.Y:0}) value={target.DivineValue:0.###} dist={target.Distance:0.#}",
                 "Auto Loot");
         }
 
         StatusMessage = target.DivineValue > 0
-            ? $"Clicked {target.DisplayName} ({target.DivineValue:0.##}e)"
-            : $"Clicked {target.DisplayName}";
+            ? $"Clicked {label} ({target.DivineValue:0.##}e)"
+            : $"Clicked {label}";
     }
 
     private static GroundLootScanSettings BuildScanSettings(AutoLootSettings settings) => new()
     {
-        StackablesOnly = settings.LootStackablesOnly,
+        StackablesOnly = settings.CurrencyOnly,
         UseValueFilter = settings.UseValueFilter,
         MinDivineValue = settings.MinDivineValue,
         PickupDistance = settings.PickupDistance,
         AlwaysPickupWaystonesAndTablets = settings.AlwaysPickupWaystonesAndTablets,
     };
-
-    private GroundLootCandidate PickNextTarget(IReadOnlyList<GroundLootCandidate> candidates)
-    {
-        GroundLootCandidate? alternate = null;
-        GroundLootCandidate? fallback = null;
-
-        foreach (var candidate in candidates)
-        {
-            if (!candidate.HasScreenPosition)
-            {
-                continue;
-            }
-
-            fallback ??= candidate;
-            if (lastTargetEntityId.HasValue && candidate.EntityId == lastTargetEntityId.Value)
-            {
-                continue;
-            }
-
-            alternate ??= candidate;
-        }
-
-        return alternate ?? fallback ?? default;
-    }
 }

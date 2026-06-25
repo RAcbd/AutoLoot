@@ -22,15 +22,19 @@ public sealed class AutoLootSettings
 
     public int ClickHoldMs = 12;
 
-    public bool LootStackablesOnly = true;
+    public bool LootStackablesOnly
+    {
+        get => CurrencyOnly;
+        set => CurrencyOnly = value;
+    }
+
+    public bool CurrencyOnly = true;
 
     public bool UseValueFilter;
 
     public double MinDivineValue;
 
     public bool AlwaysPickupWaystonesAndTablets = true;
-
-    public string NinjaLeague = "Runes of Aldur";
 
     public bool EnableDebugLogging;
 

@@ -19,20 +19,15 @@ public sealed class AutoLootPlugin : PluginBase
     private ActiveCoroutine? updateCoroutine;
     private FileInfo settingsFile = null!;
 
-    public override string Version => "0.4.1";
-
-    public override string Name => $"U | AutoLoot | v{Version}";
+    public override string Name => "AutoLoot";
 
     public override string Description => "Value-aware ground loot clicking with priority pickup.";
-
-    public override string Author => "Raff";
 
     public override void OnEnable(bool isGameOpened)
     {
         settingsFile = new FileInfo(Path.Combine(DllDirectory, "config", "settings.json"));
         settings = JsonHelper.CreateOrLoadJsonFile<AutoLootSettings>(settingsFile);
-        var pluginsRoot = NinjaPriceLoader.GetPluginsRootFromDllDirectory(DllDirectory);
-        service.Initialize(DllDirectory, pluginsRoot, settings);
+        service.Initialize(DllDirectory);
         updateCoroutine = CoroutineHandler.Start(OnPerFrameUpdate(), $"{Name}.Update");
     }
 
@@ -44,6 +39,8 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override void DrawDashboard()
     {
+        DrawLiabilityDisclaimer();
+
         ImGui.Checkbox("Enable auto loot", ref settings.Enabled);
         ImGui.SameLine();
         if (ImGui.Button("Reset stats"))
@@ -51,17 +48,19 @@ public sealed class AutoLootPlugin : PluginBase
             service.ResetStats();
         }
 
-        ImGui.Checkbox("Stackables only", ref settings.LootStackablesOnly);
+        ImGui.Checkbox("Currency only", ref settings.CurrencyOnly);
+        ImGui.TextDisabled("Picks up currency orbs, shards, fragments, runes, omens, and similar drops.");
         ImGui.Checkbox("Always pick up waystones/tablets", ref settings.AlwaysPickupWaystonesAndTablets);
         ImGui.Checkbox("Min value filter", ref settings.UseValueFilter);
         ImGui.InputDouble("Min divine value", ref settings.MinDivineValue, 0.1, 1.0);
-        ImGui.InputText("Ninja league", ref settings.NinjaLeague, 128);
         if (ImGui.Button("Reload prices"))
         {
-            service.ReloadPrices(NinjaPriceLoader.GetPluginsRootFromDllDirectory(DllDirectory), settings.NinjaLeague);
+            service.ReloadPrices();
         }
 
         ImGui.TextDisabled(service.PriceStatusMessage);
+        ImGui.TextDisabled($"Pricing league: {HostPriceHelper.League}");
+        ImGui.TextDisabled("Loot HUD and session totals are shown by BetterLootTracker.");
         ImGui.Checkbox("Show debug overlay", ref settings.ShowDebugOverlay);
         ImGui.Spacing();
         ImGui.TextColored(settings.AccentColor, "Status");
@@ -75,6 +74,42 @@ public sealed class AutoLootPlugin : PluginBase
             $"{diagnostics.FilteredByPath} filtered, {diagnostics.OutOfRange} far, {diagnostics.Clickable} clickable");
     }
 
+    private static void DrawLiabilityDisclaimer()
+    {
+        var warning = ImGuiHelper.WarningTextColor();
+        var body = new Vector4(1f, 0.93f, 0.86f, 1f);
+        var divider = new Vector4(0.5f, 0.5f, 0.5f, 1f);
+
+        ImGui.SetWindowFontScale(1.5f);
+        ImGui.PushStyleColor(ImGuiCol.Text, warning);
+        ImGui.Text("DISCLAIMER");
+        ImGui.PopStyleColor();
+
+        ImGui.PushStyleColor(ImGuiCol.Text, body);
+        ImGui.SetWindowFontScale(1.3f);
+        ImGui.TextWrapped("AutoLoot automates in-game mouse input.");
+        ImGui.TextWrapped(
+            "Raff and OriathHub are not liable for any account action, restriction, ban, or other consequence.");
+        ImGui.TextWrapped("You use AutoLoot at your own risk and accept sole responsibility for your account.");
+        ImGui.PopStyleColor();
+        ImGui.SetWindowFontScale(1f);
+
+        ImGui.Spacing();
+        var lineWidth = ImGui.GetContentRegionAvail().X;
+        var underscoreWidth = ImGui.CalcTextSize("_").X;
+        if (underscoreWidth > 0f && lineWidth > 0f)
+        {
+            var count = Math.Max(1, (int)(lineWidth / underscoreWidth));
+            ImGui.TextColored(divider, new string('_', count));
+        }
+        else
+        {
+            ImGui.Separator();
+        }
+
+        ImGui.Spacing();
+    }
+
     public override void DrawSettings()
     {
         DrawDashboard();
@@ -85,6 +120,11 @@ public sealed class AutoLootPlugin : PluginBase
         ImGui.Checkbox("Pause when panels open", ref settings.PauseWhenPanelsOpen);
         ImGui.Checkbox("Pause when chat open", ref settings.PauseWhenChatOpen);
         ImGui.DragFloat("Pickup distance", ref settings.PickupDistance, 1f, 50f, 900f);
+        if (settings.PickupDistance < 120f)
+        {
+            ImGui.TextColored(new Vector4(0.95f, 0.55f, 0.2f, 1f),
+                "Pickup distance is very low — most loot will be out of range.");
+        }
         ImGui.InputInt("Min ms between pickups", ref settings.MinMsBetweenPickups);
         ImGui.InputInt("Click hold ms", ref settings.ClickHoldMs);
         ImGui.ColorEdit4("Dashboard accent", ref settings.AccentColor);

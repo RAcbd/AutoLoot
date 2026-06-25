@@ -8,17 +8,15 @@ internal sealed class ClickTracker
 {
     private readonly Dictionary<uint, DateTime> ignoredEntityUntilUtc = new();
     private uint? pendingEntityId;
-    private bool pendingIsWorldItem;
     private DateTime pendingSinceUtc = DateTime.MinValue;
 
-    private const int PickupWaitMs = 120;
-    private const int IgnoreAfterFailedMs = 500;
+    private const int PickupWaitMs = 60;
+    private const int IgnoreAfterFailedMs = 350;
 
     public void Reset()
     {
         ignoredEntityUntilUtc.Clear();
         pendingEntityId = null;
-        pendingIsWorldItem = false;
         pendingSinceUtc = DateTime.MinValue;
     }
 
@@ -39,8 +37,8 @@ internal sealed class ClickTracker
     {
         _ = clientX;
         _ = clientY;
+        _ = isWorldItem;
         pendingEntityId = entityId;
-        pendingIsWorldItem = isWorldItem;
         pendingSinceUtc = DateTime.UtcNow;
     }
 
@@ -53,7 +51,7 @@ internal sealed class ClickTracker
         }
 
         var entityId = pendingEntityId.Value;
-        if (WasRemovedThisFrame(area, entityId))
+        if (WasRemovedThisFrame(area, entityId) || !TryFindEntity(area, entityId, out var entity))
         {
             pendingEntityId = null;
             return;
@@ -61,18 +59,6 @@ internal sealed class ClickTracker
 
         if ((DateTime.UtcNow - pendingSinceUtc).TotalMilliseconds < PickupWaitMs)
         {
-            return;
-        }
-
-        if (!TryFindEntity(area, entityId, out var entity))
-        {
-            pendingEntityId = null;
-            return;
-        }
-
-        if (pendingIsWorldItem || GroundLootRules.IsWorldItemPlaceholder(entity))
-        {
-            pendingEntityId = null;
             return;
         }
 
