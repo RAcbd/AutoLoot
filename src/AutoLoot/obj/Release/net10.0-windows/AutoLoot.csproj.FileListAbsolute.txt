@@ -1,0 +1,5 @@
+c:\Users\ralph\Downloads\OriathHub_v0.2.9-BETA\src\AutoLoot\obj\Release\net10.0-windows\AutoLoot.csproj.AssemblyReference.cache
+c:\Users\ralph\Downloads\OriathHub_v0.2.9-BETA\src\AutoLoot\obj\Release\net10.0-windows\AutoLoot.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\ralph\Downloads\OriathHub_v0.2.9-BETA\src\AutoLoot\obj\Release\net10.0-windows\AutoLoot.AssemblyInfoInputs.cache
+c:\Users\ralph\Downloads\OriathHub_v0.2.9-BETA\src\AutoLoot\obj\Release\net10.0-windows\AutoLoot.AssemblyInfo.cs
+c:\Users\ralph\Downloads\OriathHub_v0.2.9-BETA\src\AutoLoot\obj\Release\net10.0-windows\AutoLoot.csproj.CoreCompileInputs.cache
