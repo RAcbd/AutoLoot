@@ -3,7 +3,7 @@
 OriathHub plugin for Path of Exile 2 that automates ground loot pickup with optional currency-only and value filters.
 
 **Author:** Raff  
-**Version:** 0.5.0
+**Version:** 0.6.0
 
 ## Features
 

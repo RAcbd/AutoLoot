@@ -9,15 +9,27 @@ internal sealed class ClickTracker
     private readonly Dictionary<uint, DateTime> ignoredEntityUntilUtc = new();
     private uint? pendingEntityId;
     private DateTime pendingSinceUtc = DateTime.MinValue;
+    private DateTime lastClickUtc = DateTime.MinValue;
+    private DateTime successCooldownUntilUtc = DateTime.MinValue;
+    private int clicksOnPending;
 
-    private const int PickupWaitMs = 60;
-    private const int IgnoreAfterFailedMs = 350;
+    public const int MaxClicksPerTarget = 5;
+
+    public int ClicksOnPending => clicksOnPending;
+
+    private const int RetryClickIntervalMs = 40;
+    private const int PickupTimeoutMs = 250;
+    private const int IgnoreAfterFailedMs = 200;
+    private const int SuccessCooldownMs = 25;
 
     public void Reset()
     {
         ignoredEntityUntilUtc.Clear();
         pendingEntityId = null;
         pendingSinceUtc = DateTime.MinValue;
+        lastClickUtc = DateTime.MinValue;
+        successCooldownUntilUtc = DateTime.MinValue;
+        clicksOnPending = 0;
     }
 
     public bool IsIgnored(uint entityId, int clientX, int clientY)
@@ -29,17 +41,48 @@ internal sealed class ClickTracker
                entityUntil > DateTime.UtcNow;
     }
 
-    public bool ShouldWaitForPickup() =>
-        pendingEntityId.HasValue &&
-        (DateTime.UtcNow - pendingSinceUtc).TotalMilliseconds < PickupWaitMs;
+    public bool IsPickingUp => pendingEntityId.HasValue;
+
+    public bool IsInSuccessCooldown() => DateTime.UtcNow < successCooldownUntilUtc;
+
+    public bool ShouldRetryClick()
+    {
+        if (!pendingEntityId.HasValue || clicksOnPending >= MaxClicksPerTarget)
+        {
+            return false;
+        }
+
+        return clicksOnPending == 0 ||
+               (DateTime.UtcNow - lastClickUtc).TotalMilliseconds >= RetryClickIntervalMs;
+    }
+
+    public bool HasPendingPickup => pendingEntityId.HasValue;
 
     public void BeginPickup(uint entityId, int clientX, int clientY, bool isWorldItem)
     {
         _ = clientX;
         _ = clientY;
         _ = isWorldItem;
-        pendingEntityId = entityId;
-        pendingSinceUtc = DateTime.UtcNow;
+        if (pendingEntityId != entityId)
+        {
+            pendingEntityId = entityId;
+            pendingSinceUtc = DateTime.UtcNow;
+            clicksOnPending = 0;
+        }
+
+        RecordClick();
+    }
+
+    public void RecordClick()
+    {
+        clicksOnPending++;
+        lastClickUtc = DateTime.UtcNow;
+    }
+
+    public void ClearPending()
+    {
+        pendingEntityId = null;
+        clicksOnPending = 0;
     }
 
     public void UpdateFrame(AreaInstance area)
@@ -53,29 +96,32 @@ internal sealed class ClickTracker
         var entityId = pendingEntityId.Value;
         if (WasRemovedThisFrame(area, entityId) || !TryFindEntity(area, entityId, out var entity))
         {
-            pendingEntityId = null;
-            return;
-        }
-
-        if ((DateTime.UtcNow - pendingSinceUtc).TotalMilliseconds < PickupWaitMs)
-        {
+            ClearPending();
+            successCooldownUntilUtc = DateTime.UtcNow.AddMilliseconds(SuccessCooldownMs);
             return;
         }
 
         if (entity.EntityState is EntityStates.Useless)
         {
-            pendingEntityId = null;
+            ClearPending();
             return;
         }
 
         if (!GroundLootRules.IsGroundLootEntity(entity))
         {
-            pendingEntityId = null;
+            ClearPending();
+            successCooldownUntilUtc = DateTime.UtcNow.AddMilliseconds(SuccessCooldownMs);
+            return;
+        }
+
+        var pendingMs = (DateTime.UtcNow - pendingSinceUtc).TotalMilliseconds;
+        if (pendingMs < PickupTimeoutMs)
+        {
             return;
         }
 
         ignoredEntityUntilUtc[entityId] = DateTime.UtcNow.AddMilliseconds(IgnoreAfterFailedMs);
-        pendingEntityId = null;
+        ClearPending();
     }
 
     private void Prune()

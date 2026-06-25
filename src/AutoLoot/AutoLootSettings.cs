@@ -18,9 +18,9 @@ public sealed class AutoLootSettings
 
     public float PickupDistance = 600f;
 
-    public int MinMsBetweenPickups = 50;
+    public int MinMsBetweenPickups;
 
-    public int ClickHoldMs = 12;
+    public int ClickHoldMs = 10;
 
     public bool LootStackablesOnly
     {

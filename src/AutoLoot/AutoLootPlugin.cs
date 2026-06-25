@@ -23,6 +23,10 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override string Description => "Value-aware ground loot clicking with priority pickup.";
 
+    public override string Author => "Raff";
+
+    public override string Version => "0.6.0";
+
     public override void OnEnable(bool isGameOpened)
     {
         settingsFile = new FileInfo(Path.Combine(DllDirectory, "config", "settings.json"));
