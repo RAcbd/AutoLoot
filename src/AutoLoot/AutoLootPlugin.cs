@@ -17,6 +17,7 @@ public sealed class AutoLootPlugin : PluginBase
     private readonly AutoLootService service = new();
     private AutoLootSettings settings = new();
     private ActiveCoroutine? updateCoroutine;
+    private ActiveCoroutine? areaCoroutine;
     private FileInfo settingsFile = null!;
 
     public override string Name => "AutoLoot";
@@ -25,7 +26,7 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override string Author => "Raff";
 
-    public override string Version => "0.6.0";
+    public override string Version => "0.7.0";
 
     public override void OnEnable(bool isGameOpened)
     {
@@ -33,12 +34,15 @@ public sealed class AutoLootPlugin : PluginBase
         settings = JsonHelper.CreateOrLoadJsonFile<AutoLootSettings>(settingsFile);
         service.Initialize(DllDirectory);
         updateCoroutine = CoroutineHandler.Start(OnPerFrameUpdate(), $"{Name}.Update");
+        areaCoroutine = CoroutineHandler.Start(OnAreaChange(), $"{Name}.AreaChange");
     }
 
     public override void OnDisable()
     {
         updateCoroutine?.Cancel();
         updateCoroutine = null;
+        areaCoroutine?.Cancel();
+        areaCoroutine = null;
     }
 
     public override void DrawDashboard()
@@ -74,8 +78,9 @@ public sealed class AutoLootPlugin : PluginBase
 
         var diagnostics = service.LastDiagnostics;
         ImGui.TextDisabled(
-            $"Scan: {diagnostics.AwakeEntities} awake, {diagnostics.GroundEntities} ground, " +
-            $"{diagnostics.FilteredByPath} filtered, {diagnostics.OutOfRange} far, {diagnostics.Clickable} clickable");
+            $"Scan: {diagnostics.AwakeEntities} awake, {service.CachedGroundLootCount} cached, " +
+            $"{diagnostics.GroundEntities} ground, {diagnostics.FilteredByPath} filtered, " +
+            $"{diagnostics.OutOfRange} far, {diagnostics.Clickable} clickable");
     }
 
     private static void DrawLiabilityDisclaimer()
@@ -164,6 +169,15 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override void SaveSettings() => JsonHelper.SaveToFile(settings, settingsFile);
 
+    private IEnumerator<Wait> OnAreaChange()
+    {
+        while (true)
+        {
+            yield return new Wait(RemoteEvents.AreaChanged);
+            service.OnAreaChanged();
+        }
+    }
+
     private IEnumerator<Wait> OnPerFrameUpdate()
     {
         while (true)
@@ -186,6 +200,7 @@ public sealed class AutoLootPlugin : PluginBase
         service.ProcessFrame(
             inGame,
             area,
+            areaDetails.Id,
             areaDetails.IsTown,
             areaDetails.IsHideout,
             settings);

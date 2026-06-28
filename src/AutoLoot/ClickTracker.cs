@@ -85,7 +85,7 @@ internal sealed class ClickTracker
         clicksOnPending = 0;
     }
 
-    public void UpdateFrame(AreaInstance area)
+    public void UpdateFrame(AreaInstance area, GroundLootEntityCache? groundLootCache = null)
     {
         Prune();
         if (!pendingEntityId.HasValue)
@@ -94,7 +94,7 @@ internal sealed class ClickTracker
         }
 
         var entityId = pendingEntityId.Value;
-        if (WasRemovedThisFrame(area, entityId) || !TryFindEntity(area, entityId, out var entity))
+        if (WasRemovedThisFrame(area, entityId) || !TryFindEntity(area, entityId, groundLootCache, out var entity))
         {
             ClearPending();
             successCooldownUntilUtc = DateTime.UtcNow.AddMilliseconds(SuccessCooldownMs);
@@ -146,8 +146,17 @@ internal sealed class ClickTracker
         return false;
     }
 
-    private static bool TryFindEntity(AreaInstance area, uint entityId, out Entity entity)
+    private static bool TryFindEntity(
+        AreaInstance area,
+        uint entityId,
+        GroundLootEntityCache? groundLootCache,
+        out Entity entity)
     {
+        if (groundLootCache?.TryGetEntity(entityId, out entity) == true)
+        {
+            return true;
+        }
+
         foreach (var (_, candidate) in area.AwakeEntities)
         {
             if (candidate.Id == entityId)

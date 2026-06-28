@@ -11,6 +11,7 @@ internal sealed class AutoLootService
 {
     private readonly List<GroundLootMarker> debugMarkers = [];
     private readonly ClickTracker clickTracker = new();
+    private readonly GroundLootEntityCache groundLootCache = new();
     private readonly LootPriceService prices = new();
     private DateTime lastPickupAttemptUtc = DateTime.MinValue;
     private IReadOnlyList<GroundLootCandidate> lastCandidates = Array.Empty<GroundLootCandidate>();
@@ -20,6 +21,8 @@ internal sealed class AutoLootService
     private uint? stickyTargetId;
 
     public int PickupAttempts { get; private set; }
+
+    public int CachedGroundLootCount => groundLootCache.Count;
 
     public string StatusMessage { get; private set; } = "Idle";
 
@@ -45,6 +48,8 @@ internal sealed class AutoLootService
 
     public void ReloadPrices() => prices.RefreshPrices();
 
+    public void OnAreaChanged() => groundLootCache.Reset();
+
     public void ResetStats()
     {
         PickupAttempts = 0;
@@ -53,6 +58,7 @@ internal sealed class AutoLootService
         lastDiagnostics = new GroundLootScanDiagnostics();
         debugMarkers.Clear();
         clickTracker.Reset();
+        groundLootCache.Reset();
         stickyTargetId = null;
         StatusMessage = "Idle";
     }
@@ -60,11 +66,13 @@ internal sealed class AutoLootService
     public void ProcessFrame(
         InGameState inGame,
         AreaInstance area,
+        string areaId,
         bool isTown,
         bool isHideout,
         AutoLootSettings settings)
     {
-        clickTracker.UpdateFrame(area);
+        clickTracker.UpdateFrame(area, groundLootCache);
+        groundLootCache.UpdateFrame(area, areaId);
 
         if (!settings.Enabled)
         {
@@ -100,6 +108,7 @@ internal sealed class AutoLootService
 
         var scanSettings = BuildScanSettings(settings);
         var priceService = settings.UseValueFilter ? prices : null;
+        var groundLoot = groundLootCache.Entities;
         if (clickTracker.IsInSuccessCooldown())
         {
             StatusMessage = "Waiting for pickup";
@@ -116,6 +125,7 @@ internal sealed class AutoLootService
             GroundLootScanner.Scan(
                 inGame,
                 area,
+                groundLoot,
                 scanSettings,
                 priceService,
                 clickTracker.IsIgnored,
@@ -129,6 +139,7 @@ internal sealed class AutoLootService
             if (!GroundLootScanner.TryFindPickupTarget(
                     inGame,
                     area,
+                    groundLoot,
                     scanSettings,
                     priceService,
                     clickTracker.IsIgnored,
@@ -165,6 +176,7 @@ internal sealed class AutoLootService
         if (!GroundLootScanner.TryFindPickupTarget(
                 inGame,
                 area,
+                groundLoot,
                 scanSettings,
                 priceService,
                 clickTracker.IsIgnored,
@@ -176,7 +188,7 @@ internal sealed class AutoLootService
             lastCandidates = Array.Empty<GroundLootCandidate>();
             lastDiagnostics = diagnostics;
             StatusMessage = diagnostics.GroundEntities == 0
-                ? $"No ground loot seen ({diagnostics.AwakeEntities} awake)"
+                ? $"No ground loot seen ({diagnostics.AwakeEntities} awake, {groundLootCache.Count} cached)"
                 : diagnostics.FilteredByPath == diagnostics.GroundEntities
                     ? $"All loot filtered ({diagnostics.GroundEntities} ground)"
                     : $"No loot in range ({diagnostics.GroundEntities} ground, {diagnostics.OutOfRange} far)";

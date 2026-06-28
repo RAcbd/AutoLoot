@@ -3,20 +3,21 @@
 OriathHub plugin for Path of Exile 2 that automates ground loot pickup with optional currency-only and value filters.
 
 **Author:** Raff  
-**Version:** 0.6.0
+**Version:** 0.7.0
 
 ## Features
 
 - Automated ground loot clicking with pickup distance and safety pauses
 - Currency-only mode for orbs, shards, fragments, runes, omens, and similar drops
-- Optional minimum divine value filter using OriathHub host pricing (SDK 0.7.2)
+- Optional minimum divine value filter using OriathHub host pricing (SDK 0.10.1)
+- Ground-loot entity cache (snapshot + per-frame deltas) for faster, stable scanning
 - Cursor position restored after each pickup click
 - Liability disclaimer in the dashboard
 - Loot HUD and session totals via BetterLootTracker integration
 
 ## Requirements
 
-- [OriathHub](https://github.com/danthespal/OriathHubSDK) with SDK 0.7.2+
+- [OriathHub](https://github.com/danthespal/OriathHubSDK) with SDK 0.10.1+
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) (build from source only)
 - [BetterLootTracker](https://github.com/RAcbd/BetterLootTracker) (recommended, for loot HUD)
 
