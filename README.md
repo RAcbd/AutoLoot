@@ -5,49 +5,35 @@ OriathHub plugin for Path of Exile 2 that automates ground loot pickup with opti
 **Author:** Raff  
 **Version:** 0.7.2
 
-## Features
-
-- Automated ground loot clicking with pickup distance and safety pauses
-- Currency-only mode for orbs, shards, fragments, runes, omens, and similar drops
-- Optional minimum divine value filter using OriathHub host pricing (SDK 0.10.1)
-- Ground-loot entity cache (snapshot + per-frame deltas) for faster, stable scanning
-- Skips gold piles in all modes (game auto-picks them); currency-only mode works for orb WorldItem placeholders
-- Cursor position restored after each pickup click
-- Liability disclaimer in the dashboard
-- Loot HUD and session totals via BetterLootTracker integration
-
-## Requirements
-
-- [OriathHub](https://github.com/danthespal/OriathHubSDK) with SDK 0.10.1+
-- [.NET 10 SDK](https://dotnet.microsoft.com/download) (build from source only)
-- [BetterLootTracker](https://github.com/RAcbd/BetterLootTracker) (recommended, for loot HUD)
-
 ## Install
 
-**OriathHub Marketplace (recommended):** install or update from the in-app catalog. Marketplace builds from this repo’s source, or installs the latest [Release zip](https://github.com/RAcbd/AutoLoot/releases).
+**OriathHub Marketplace (recommended):** install or update from the in-app catalog — builds from this repo or installs the latest [Release zip](https://github.com/RAcbd/AutoLoot/releases).
 
-**Manual from Release:** download `AutoLoot-<version>.zip` from [Releases](https://github.com/RAcbd/AutoLoot/releases) and extract into your OriathHub `Plugins/` folder.
-
-**Manual from source:** clone this repo and build (see below), then copy the output DLLs plus `config/` and `data/` into `Plugins/AutoLoot/`.
+**Manual from Release:** download `AutoLoot-<version>.zip` — contains a single `AutoLoot.dll` (shared code merged in).
 
 ## Repository layout
 
-This repo is **source only**. DLLs and release zips are not committed — they are published on [GitHub Releases](https://github.com/RAcbd/AutoLoot/releases) when tagged.
+Source-only repo. Flat layout — no nested `src/AutoLoot/`, no committed `config/` or `data/` (created at runtime).
 
 ```
 AutoLoot/
-  src/AutoLoot/          # C# source
-  config/                # Example settings
-  data/                  # Default currency name mappings
+  *.cs                 # plugin source
+  AutoLoot.csproj
+  OriathPlugins.Common/  # shared library (compiled + merged into AutoLoot.dll on Release)
+  build/               # ILRepack merge targets
 ```
 
-## Build from source
+`config/settings.json` and `data/currency-names.json` are created automatically on first run. Default currency names are embedded in the DLL.
+
+## Build
+
+Requires [.NET 10 SDK](https://dotnet.microsoft.com/download) and [OriathHub SDK 0.10.1+](https://github.com/danthespal/OriathHubSDK). Marketplace supplies the SDK when building from source.
 
 ```powershell
-cd src/AutoLoot
-dotnet restore
-dotnet build -c Release
+dotnet build AutoLoot.csproj -c Release
 ```
+
+Release output is a **single** `bin/Release/net10.0-windows/AutoLoot.dll` (Common merged via ILRepack).
 
 ## License
 
