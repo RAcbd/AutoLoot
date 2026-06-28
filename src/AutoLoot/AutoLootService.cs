@@ -233,7 +233,12 @@ internal sealed class AutoLootService
             return false;
         }
 
-        var screen = ScreenPositionResolver.ClientToScreen(target.ClientPosition);
+        if (!ScreenPositionResolver.TryGetClickableScreenPosition(target.ClientPosition, out var screen))
+        {
+            StatusMessage = "Target off-screen";
+            return false;
+        }
+
         var restoreCursor = diagnostics.Clickable <= 1 && !clickTracker.HasPendingPickup;
         var clicked = GameMouseInput.TryClick(
             (int)Math.Round(screen.X),

@@ -26,7 +26,7 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override string Author => "Raff";
 
-    public override string Version => "0.7.0";
+    public override string Version => "0.7.1";
 
     public override void OnEnable(bool isGameOpened)
     {
@@ -57,7 +57,7 @@ public sealed class AutoLootPlugin : PluginBase
         }
 
         ImGui.Checkbox("Currency only", ref settings.CurrencyOnly);
-        ImGui.TextDisabled("Picks up currency orbs, shards, fragments, runes, omens, and similar drops.");
+        ImGui.TextDisabled("Picks up currency orbs, shards, fragments, runes, omens, and similar drops. Gold is never clicked (game auto-picks it).");
         ImGui.Checkbox("Always pick up waystones/tablets", ref settings.AlwaysPickupWaystonesAndTablets);
         ImGui.Checkbox("Min value filter", ref settings.UseValueFilter);
         ImGui.InputDouble("Min divine value", ref settings.MinDivineValue, 0.1, 1.0);
