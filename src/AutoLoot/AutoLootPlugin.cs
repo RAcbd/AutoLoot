@@ -26,7 +26,7 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override string Author => "Raff";
 
-    public override string Version => "0.7.1";
+    public override string Version => "0.7.2";
 
     public override void OnEnable(bool isGameOpened)
     {
