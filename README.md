@@ -23,8 +23,8 @@ OriathHub plugin for Path of Exile 2 that automates ground loot pickup with opti
 
 ## Install
 
-1. Download `AutoLoot.dll` and `OriathPlugins.Common.dll` from [Releases](https://github.com/RAcbd/AutoLoot/releases).
-2. Copy into your OriathHub `Plugins/AutoLoot/` folder:
+1. Download **`AutoLoot-0.7.0.zip`** (recommended) or `AutoLoot.dll` + `OriathPlugins.Common.dll` from [Releases](https://github.com/RAcbd/AutoLoot/releases).
+2. Extract or copy into your OriathHub `Plugins/` folder so you have:
    ```
    Plugins/AutoLoot/
      AutoLoot.dll
