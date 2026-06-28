@@ -24,16 +24,22 @@ OriathHub plugin for Path of Exile 2 that automates ground loot pickup with opti
 
 ## Install
 
-1. Download **`AutoLoot-<version>.zip`** (recommended for OriathHub Marketplace) or `AutoLoot.dll` + `OriathPlugins.Common.dll` from [Releases](https://github.com/RAcbd/AutoLoot/releases).
-2. Extract or copy into your OriathHub `Plugins/` folder so you have:
-   ```
-   Plugins/AutoLoot/
-     AutoLoot.dll
-     OriathPlugins.Common.dll
-     config/settings.json.example   → copy to settings.json
-     data/currency-names.json
-   ```
-3. Enable the plugin in OriathHub.
+**OriathHub Marketplace (recommended):** install or update from the in-app catalog. Marketplace builds from this repo’s source, or installs the latest [Release zip](https://github.com/RAcbd/AutoLoot/releases).
+
+**Manual from Release:** download `AutoLoot-<version>.zip` from [Releases](https://github.com/RAcbd/AutoLoot/releases) and extract into your OriathHub `Plugins/` folder.
+
+**Manual from source:** clone this repo and build (see below), then copy the output DLLs plus `config/` and `data/` into `Plugins/AutoLoot/`.
+
+## Repository layout
+
+This repo is **source only**. DLLs and release zips are not committed — they are published on [GitHub Releases](https://github.com/RAcbd/AutoLoot/releases) when tagged.
+
+```
+AutoLoot/
+  src/AutoLoot/          # C# source
+  config/                # Example settings
+  data/                  # Default currency name mappings
+```
 
 ## Build from source
 
@@ -41,39 +47,6 @@ OriathHub plugin for Path of Exile 2 that automates ground loot pickup with opti
 cd src/AutoLoot
 dotnet restore
 dotnet build -c Release
-```
-
-## Releasing (maintainers)
-
-OriathHub **Marketplace auto-update** installs from the GitHub Release **`.zip`**, not loose DLLs alone. Every release tag must include:
-
-| Asset | Purpose |
-|-------|---------|
-| `AutoLoot-<version>.zip` | Marketplace one-click install / update |
-| `AutoLoot.dll` | Manual install |
-| `OriathPlugins.Common.dll` | Required dependency |
-
-Zip layout:
-
-```
-AutoLoot/
-  AutoLoot.dll
-  OriathPlugins.Common.dll
-  config/settings.json.example
-  data/currency-names.json
-```
-
-From the monorepo root (build + zip + optional publish):
-
-```powershell
-.\scripts\Release-OriathPlugin.ps1 -Plugin AutoLoot -Version 0.7.1
-.\scripts\Release-OriathPlugin.ps1 -Plugin AutoLoot -Version 0.7.1 -Publish -NotesFile release-notes.txt
-```
-
-Or zip only (DLLs already built in this folder):
-
-```powershell
-.\scripts\Package-ReleaseZip.ps1 -Version 0.7.1
 ```
 
 ## License
