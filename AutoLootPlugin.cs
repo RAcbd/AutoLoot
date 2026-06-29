@@ -26,7 +26,10 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override string Author => "Raff";
 
-    public override string Version => "0.7.3";
+    public override string Version => "0.7.4";
+
+    private string whitelistSearch = string.Empty;
+    private string blacklistSearch = string.Empty;
 
     public override void OnEnable(bool isGameOpened)
     {
@@ -58,10 +61,10 @@ public sealed class AutoLootPlugin : PluginBase
 
         ImGui.Checkbox("Currency only", ref settings.CurrencyOnly);
         ImGui.TextDisabled("Picks up currency orbs, shards, fragments, runes, omens, and similar drops. Gold is never clicked (game auto-picks it).");
-        DrawPathListEditor("Pickup whitelist (one path fragment per line)", settings.PickupWhitelist,
-            "Always pick up items matching these path or name fragments, even with currency-only on.");
-        DrawPathListEditor("Pickup blacklist (one path fragment per line)", settings.PickupBlacklist,
-            "Never pick up items matching these fragments (overrides currency-only and whitelist).");
+        DrawPickupPathFilter("Whitelist", settings.PickupWhitelist, ref whitelistSearch,
+            "Always pick up matching currencies/items, even with currency-only on.");
+        DrawPickupPathFilter("Blacklist", settings.PickupBlacklist, ref blacklistSearch,
+            "Never pick up matching currencies/items (overrides whitelist and currency-only).");
         ImGui.Checkbox("Always pick up waystones/tablets", ref settings.AlwaysPickupWaystonesAndTablets);
         ImGui.Checkbox("Min value filter", ref settings.UseValueFilter);
         ImGui.InputDouble("Min divine value", ref settings.MinDivineValue, 0.1, 1.0);
@@ -133,7 +136,7 @@ public sealed class AutoLootPlugin : PluginBase
         ImGui.Checkbox("Pause when panels open", ref settings.PauseWhenPanelsOpen);
         ImGui.Checkbox("Pause when chat open", ref settings.PauseWhenChatOpen);
         ImGui.DragFloat("Pickup distance", ref settings.PickupDistance, 1f, 50f, 900f);
-        ImGui.TextDisabled("Loot must be inside OriathHub inner/outer nearby circles and within this distance.");
+        ImGui.TextDisabled("Max world distance for pickup. Tagged entities must also be in a nearby circle.");
         if (settings.PickupDistance < 120f)
         {
             ImGui.TextColored(new Vector4(0.95f, 0.55f, 0.2f, 1f),
@@ -174,22 +177,72 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override void SaveSettings() => JsonHelper.SaveToFile(settings, settingsFile);
 
-    private static void DrawPathListEditor(string label, List<string> list, string tooltip)
+    private void DrawPickupPathFilter(string title, List<string> entries, ref string search, string tooltip)
     {
-        var buffer = string.Join('\n', list);
-        ImGui.TextUnformatted(label);
+        ImGui.TextUnformatted(title);
         ImGuiHelper.ToolTip(tooltip);
-        if (ImGui.InputTextMultiline($"##{label}", ref buffer, 8192, new Vector2(-1, 52)))
+
+        var options = service.GetCurrencyOptions();
+        var searchTerm = search.Trim();
+        var filtered = options
+            .Where(option => string.IsNullOrEmpty(searchTerm) ||
+                             option.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                             option.Id.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * 0.55f);
+        ImGui.InputTextWithHint($"##{title}Search", "Search currencies...", ref search, 128);
+        ImGui.SameLine();
+        if (ImGui.BeginCombo($"Add to {title}##{title}Combo", "Choose currency..."))
         {
-            list.Clear();
-            foreach (var line in buffer.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            foreach (var option in filtered.Take(50))
             {
-                if (!string.IsNullOrWhiteSpace(line))
+                var alreadyListed = entries.Contains(option.Id, StringComparer.OrdinalIgnoreCase);
+                if (ImGui.Selectable($"{option.Name}##{title}_{option.Id}", alreadyListed))
                 {
-                    list.Add(line);
+                    if (!alreadyListed)
+                    {
+                        entries.Add(option.Id);
+                    }
                 }
             }
+
+            ImGui.EndCombo();
         }
+
+        if (entries.Count > 0 && ImGui.BeginChild($"##{title}List", new Vector2(0, Math.Min(120, 22 + entries.Count * 20))))
+        {
+            for (var i = entries.Count - 1; i >= 0; i--)
+            {
+                var entry = entries[i];
+                var label = ResolvePickupListLabel(entry, options);
+                ImGui.TextUnformatted(label);
+                ImGui.SameLine();
+                if (ImGui.SmallButton($"Remove##{title}_{i}"))
+                {
+                    entries.RemoveAt(i);
+                }
+            }
+
+            ImGui.EndChild();
+        }
+        else
+        {
+            ImGui.TextDisabled($"No {title.ToLowerInvariant()} entries.");
+        }
+    }
+
+    private static string ResolvePickupListLabel(string entry, IReadOnlyList<CurrencyOption> options)
+    {
+        foreach (var option in options)
+        {
+            if (option.Id.Equals(entry, StringComparison.OrdinalIgnoreCase))
+            {
+                return option.Name;
+            }
+        }
+
+        return entry;
     }
 
     private IEnumerator<Wait> OnAreaChange()

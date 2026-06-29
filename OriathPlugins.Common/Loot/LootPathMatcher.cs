@@ -214,11 +214,11 @@ public static class LootPathMatcher
             return false;
         }
 
-        // Unresolved WorldItem placeholders: only stackables that are not gold/equipment.
+        // Unresolved WorldItem placeholders before Animated paths resolve (gold filtered above).
         if (GroundLootRules.IsWorldItemPlaceholder(entity) ||
             entity.EntitySubtype is EntitySubtypes.WorldItem)
         {
-            return entity.TryGetComponent<Stack>(out _);
+            return !IsEquipmentDrop(entity);
         }
 
         return false;
@@ -254,6 +254,23 @@ public static class LootPathMatcher
             {
                 if (!string.IsNullOrWhiteSpace(path) &&
                     path.Contains(entry, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                var ninjaId = CurrencyPathMapper.TryMapToNinjaId(path);
+                if (!string.IsNullOrWhiteSpace(ninjaId) &&
+                    ninjaId.Equals(entry, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(itemPath))
+            {
+                var resolvedId = CurrencyPathMapper.TryMapToNinjaId(itemPath);
+                if (!string.IsNullOrWhiteSpace(resolvedId) &&
+                    resolvedId.Equals(entry, StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }

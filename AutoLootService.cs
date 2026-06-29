@@ -28,6 +28,8 @@ internal sealed class AutoLootService
 
     public string PriceStatusMessage => prices.StatusMessage;
 
+    public IReadOnlyList<CurrencyOption> GetCurrencyOptions() => prices.GetCurrencyOptions();
+
     public IReadOnlyList<GroundLootCandidate> LastCandidates => lastCandidates;
 
     public IReadOnlyList<GroundLootMarker> DebugMarkers => debugMarkers;

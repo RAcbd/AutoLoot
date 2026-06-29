@@ -36,10 +36,10 @@ public sealed class AutoLootSettings
 
     public bool AlwaysPickupWaystonesAndTablets = true;
 
-    /// <summary>One entry per line in settings UI — matched against item paths and display names.</summary>
+    /// <summary>Ninja id or path fragment — matched against loot paths and currency ids.</summary>
     public List<string> PickupWhitelist = [];
 
-    /// <summary>One entry per line in settings UI — matched against item paths and display names.</summary>
+    /// <summary>Ninja id or path fragment — matched against loot paths and currency ids.</summary>
     public List<string> PickupBlacklist = [];
 
     public bool EnableDebugLogging;

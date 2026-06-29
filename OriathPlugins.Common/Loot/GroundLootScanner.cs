@@ -425,14 +425,19 @@ public static class GroundLootScanner
             return false;
         }
 
-        // Only loot inside the host's nearby circles (same space entity processing uses).
-        if (entity.Zones is not (NearbyZones.InnerCircle or NearbyZones.OuterCircle))
+        distance = entity.DistanceFrom(area.Player);
+        if (distance <= 0f || distance > pickupDistance)
         {
-            distance = entity.DistanceFrom(area.Player);
             return false;
         }
 
-        distance = entity.DistanceFrom(area.Player);
-        return distance > 0f && distance <= pickupDistance;
+        // Ground loot is usually untagged; only enforce nearby circles when the host assigned a zone.
+        if (entity.Zones == NearbyZones.None)
+        {
+            return true;
+        }
+
+        return entity.Zones.HasFlag(NearbyZones.InnerCircle) ||
+               entity.Zones.HasFlag(NearbyZones.OuterCircle);
     }
 }
