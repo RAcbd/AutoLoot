@@ -413,6 +413,56 @@ public static class GroundLootScanner
         return 10;
     }
 
+    public static IReadOnlyList<GroundLootFilterOption> GetNearbyGroundLootFilterOptions(
+        AreaInstance area,
+        IEnumerable<Entity> groundLootEntities,
+        GroundLootScanSettings settings,
+        LootPriceService? prices,
+        bool excludeDefaultPickup)
+    {
+        var results = new List<GroundLootFilterOption>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!area.Player.IsValid)
+        {
+            return results;
+        }
+
+        foreach (var entity in groundLootEntities)
+        {
+            if (!entity.IsValid || !GroundLootRules.IsGroundLootEntity(entity) || LootPathMatcher.IsGoldEntity(entity))
+            {
+                continue;
+            }
+
+            if (!IsInPickupRange(area, entity, settings.PickupDistance, out _))
+            {
+                continue;
+            }
+
+            var itemPath = GroundLootRules.ResolveItemPath(entity) ?? string.Empty;
+            var displayName = GroundLootRules.ResolveDisplayName(entity);
+            if (excludeDefaultPickup &&
+                LootPathMatcher.IsPickedUpByDefaultRules(entity, itemPath, settings, prices))
+            {
+                continue;
+            }
+
+            var key = !string.IsNullOrWhiteSpace(itemPath)
+                ? itemPath
+                : CurrencyPathMapper.TryMapToNinjaId(itemPath) ?? displayName;
+            if (string.IsNullOrWhiteSpace(key) || !seen.Add(key))
+            {
+                continue;
+            }
+
+            results.Add(new GroundLootFilterOption(key, displayName, itemPath));
+        }
+
+        results.Sort(static (left, right) =>
+            string.Compare(left.DisplayName, right.DisplayName, StringComparison.OrdinalIgnoreCase));
+        return results;
+    }
+
     private static bool IsInPickupRange(
         AreaInstance area,
         Entity entity,

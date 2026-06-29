@@ -26,7 +26,7 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override string Author => "Raff";
 
-    public override string Version => "0.7.4";
+    public override string Version => "0.7.5";
 
     private string whitelistSearch = string.Empty;
     private string blacklistSearch = string.Empty;
@@ -62,9 +62,11 @@ public sealed class AutoLootPlugin : PluginBase
         ImGui.Checkbox("Currency only", ref settings.CurrencyOnly);
         ImGui.TextDisabled("Picks up currency orbs, shards, fragments, runes, omens, and similar drops. Gold is never clicked (game auto-picks it).");
         DrawPickupPathFilter("Whitelist", settings.PickupWhitelist, ref whitelistSearch,
-            "Always pick up matching currencies/items, even with currency-only on.");
+            excludeDefaultPickup: true,
+            "Force pickup for nearby ground loot that currency-only would otherwise skip (gear, uniques, etc.).");
         DrawPickupPathFilter("Blacklist", settings.PickupBlacklist, ref blacklistSearch,
-            "Never pick up matching currencies/items (overrides whitelist and currency-only).");
+            excludeDefaultPickup: false,
+            "Never pick up matching nearby ground loot (including currencies already picked by default).");
         ImGui.Checkbox("Always pick up waystones/tablets", ref settings.AlwaysPickupWaystonesAndTablets);
         ImGui.Checkbox("Min value filter", ref settings.UseValueFilter);
         ImGui.InputDouble("Min divine value", ref settings.MinDivineValue, 0.1, 1.0);
@@ -177,37 +179,75 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override void SaveSettings() => JsonHelper.SaveToFile(settings, settingsFile);
 
-    private void DrawPickupPathFilter(string title, List<string> entries, ref string search, string tooltip)
+    private void DrawPickupPathFilter(
+        string title,
+        List<string> entries,
+        ref string search,
+        bool excludeDefaultPickup,
+        string tooltip)
     {
         ImGui.TextUnformatted(title);
         ImGuiHelper.ToolTip(tooltip);
 
-        var options = service.GetCurrencyOptions();
+        IReadOnlyList<GroundLootFilterOption> options = Array.Empty<GroundLootFilterOption>();
+        if (Core.States.GameCurrentState == GameStateTypes.InGameState)
+        {
+            var inGame = Core.States.InGameStateObject;
+            options = service.GetNearbyGroundLootFilterOptions(
+                inGame,
+                inGame.CurrentAreaInstance,
+                settings,
+                excludeDefaultPickup);
+        }
+
         var searchTerm = search.Trim();
         var filtered = options
             .Where(option => string.IsNullOrEmpty(searchTerm) ||
-                             option.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                             option.Id.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                             option.DisplayName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                             option.ItemPath.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                             option.Key.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
+        if (options.Count == 0)
+        {
+            ImGui.TextDisabled(excludeDefaultPickup
+                ? "No extra loot on the ground nearby (only default currencies or nothing in range)."
+                : "No loot on the ground nearby — stand in a map within pickup distance.");
+        }
+
         ImGui.SetNextItemWidth(ImGui.GetContentRegionAvail().X * 0.55f);
-        ImGui.InputTextWithHint($"##{title}Search", "Search currencies...", ref search, 128);
+        ImGui.InputTextWithHint($"##{title}Search", "Search nearby loot...", ref search, 128);
         ImGui.SameLine();
-        if (ImGui.BeginCombo($"Add to {title}##{title}Combo", "Choose currency..."))
+        if (options.Count == 0)
+        {
+            ImGui.BeginDisabled();
+        }
+
+        if (ImGui.BeginCombo($"Add to {title}##{title}Combo", "Choose nearby loot..."))
         {
             foreach (var option in filtered.Take(50))
             {
-                var alreadyListed = entries.Contains(option.Id, StringComparer.OrdinalIgnoreCase);
-                if (ImGui.Selectable($"{option.Name}##{title}_{option.Id}", alreadyListed))
+                var alreadyListed = entries.Contains(option.Key, StringComparer.OrdinalIgnoreCase);
+                if (ImGui.Selectable($"{option.DisplayName}##{title}_{option.Key}", alreadyListed))
                 {
                     if (!alreadyListed)
                     {
-                        entries.Add(option.Id);
+                        entries.Add(option.Key);
                     }
+                }
+
+                if (ImGui.IsItemHovered() && !string.IsNullOrWhiteSpace(option.ItemPath))
+                {
+                    ImGui.SetTooltip(option.ItemPath);
                 }
             }
 
             ImGui.EndCombo();
+        }
+
+        if (options.Count == 0)
+        {
+            ImGui.EndDisabled();
         }
 
         if (entries.Count > 0 && ImGui.BeginChild($"##{title}List", new Vector2(0, Math.Min(120, 22 + entries.Count * 20))))
@@ -232,14 +272,19 @@ public sealed class AutoLootPlugin : PluginBase
         }
     }
 
-    private static string ResolvePickupListLabel(string entry, IReadOnlyList<CurrencyOption> options)
+    private static string ResolvePickupListLabel(string entry, IReadOnlyList<GroundLootFilterOption> options)
     {
         foreach (var option in options)
         {
-            if (option.Id.Equals(entry, StringComparison.OrdinalIgnoreCase))
+            if (option.Key.Equals(entry, StringComparison.OrdinalIgnoreCase))
             {
-                return option.Name;
+                return option.DisplayName;
             }
+        }
+
+        if (entry.Contains('/', StringComparison.Ordinal))
+        {
+            return LootPathMatcher.GetDisplayName(entry);
         }
 
         return entry;

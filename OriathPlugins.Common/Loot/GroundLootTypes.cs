@@ -28,6 +28,9 @@ public readonly record struct GroundLootCandidate(
     double DivineValue,
     int PickupPriority);
 
+/// <summary>Loot type visible on the ground for whitelist/blacklist UI.</summary>
+public readonly record struct GroundLootFilterOption(string Key, string DisplayName, string ItemPath);
+
 public sealed class GroundLootScanSettings
 {
     public bool StackablesOnly

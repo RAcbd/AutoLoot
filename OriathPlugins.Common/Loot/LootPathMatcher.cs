@@ -230,6 +230,38 @@ public static class LootPathMatcher
     public static bool IsBlacklisted(Entity entity, string? itemPath, IReadOnlyList<string>? entries) =>
         MatchesPathList(entity, itemPath, entries);
 
+    /// <summary>Whether default rules (no whitelist/blacklist) would pick up this entity.</summary>
+    public static bool IsPickedUpByDefaultRules(
+        Entity entity,
+        string itemPath,
+        GroundLootScanSettings settings,
+        LootPriceService? prices)
+    {
+        if (IsGoldEntity(entity))
+        {
+            return false;
+        }
+
+        var divineValue = 0d;
+        if (prices is not null)
+        {
+            prices.TryEvaluateGroundLoot(entity, out divineValue, out _);
+        }
+
+        var defaultSettings = new GroundLootScanSettings
+        {
+            CurrencyOnly = settings.CurrencyOnly,
+            UseValueFilter = settings.UseValueFilter,
+            MinDivineValue = settings.MinDivineValue,
+            PickupDistance = settings.PickupDistance,
+            AlwaysPickupWaystonesAndTablets = settings.AlwaysPickupWaystonesAndTablets,
+            PickupWhitelist = Array.Empty<string>(),
+            PickupBlacklist = Array.Empty<string>(),
+        };
+
+        return ShouldPickup(entity, itemPath, divineValue, defaultSettings, prices);
+    }
+
     private static bool MatchesPathList(Entity entity, string? itemPath, IReadOnlyList<string>? entries)
     {
         if (entries is null || entries.Count == 0)

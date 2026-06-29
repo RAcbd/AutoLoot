@@ -28,7 +28,22 @@ internal sealed class AutoLootService
 
     public string PriceStatusMessage => prices.StatusMessage;
 
-    public IReadOnlyList<CurrencyOption> GetCurrencyOptions() => prices.GetCurrencyOptions();
+    public IReadOnlyList<GroundLootFilterOption> GetNearbyGroundLootFilterOptions(
+        InGameState inGame,
+        AreaInstance area,
+        AutoLootSettings settings,
+        bool excludeDefaultPickup)
+    {
+        groundLootCache.UpdateFrame(area, inGame.CurrentWorldInstance.AreaDetails.Id);
+        var scanSettings = BuildScanSettings(settings);
+        var priceService = settings.UseValueFilter ? prices : null;
+        return GroundLootScanner.GetNearbyGroundLootFilterOptions(
+            area,
+            groundLootCache.Entities,
+            scanSettings,
+            priceService,
+            excludeDefaultPickup);
+    }
 
     public IReadOnlyList<GroundLootCandidate> LastCandidates => lastCandidates;
 
