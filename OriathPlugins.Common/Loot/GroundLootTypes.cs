@@ -45,6 +45,12 @@ public sealed class GroundLootScanSettings
     public float PickupDistance = 600f;
 
     public bool AlwaysPickupWaystonesAndTablets = true;
+
+    /// <summary>Path or display-name substrings that are always picked up (even when currency-only).</summary>
+    public IReadOnlyList<string> PickupWhitelist = Array.Empty<string>();
+
+    /// <summary>Path or display-name substrings that are never picked up.</summary>
+    public IReadOnlyList<string> PickupBlacklist = Array.Empty<string>();
 }
 
 public sealed class GroundLootScanDiagnostics

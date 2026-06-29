@@ -71,14 +71,18 @@ public static class LootPathMatcher
 
         if (path.Contains("/GoldCoin", StringComparison.OrdinalIgnoreCase) ||
             path.Contains("/Currency/Gold", StringComparison.OrdinalIgnoreCase) ||
-            path.Contains("CoinPile", StringComparison.OrdinalIgnoreCase))
+            path.Contains("/StackableCurrency/Gold", StringComparison.OrdinalIgnoreCase) ||
+            path.Contains("CoinPile", StringComparison.OrdinalIgnoreCase) ||
+            path.Contains("GoldPile", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
 
         var fileName = GetFileName(path);
         return fileName.Equals("Gold", StringComparison.OrdinalIgnoreCase) ||
-               fileName.Equals("GoldCoin", StringComparison.OrdinalIgnoreCase);
+               fileName.Equals("GoldCoin", StringComparison.OrdinalIgnoreCase) ||
+               (fileName.StartsWith("Gold", StringComparison.OrdinalIgnoreCase) &&
+                !fileName.Contains("Golden", StringComparison.OrdinalIgnoreCase));
     }
 
     public static bool IsGoldEntity(Entity entity)
@@ -98,7 +102,13 @@ public static class LootPathMatcher
         }
 
         var displayName = GroundLootRules.ResolveDisplayName(entity);
-        return displayName.Equals("Gold", StringComparison.OrdinalIgnoreCase);
+        if (displayName.Equals("Gold", StringComparison.OrdinalIgnoreCase) ||
+            displayName.StartsWith("Gold ", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     public static bool ShouldPickup(
@@ -118,12 +128,27 @@ public static class LootPathMatcher
             return false;
         }
 
+        if (IsBlacklisted(entity, itemPath, settings.PickupBlacklist))
+        {
+            return false;
+        }
+
+        if (IsWhitelisted(entity, itemPath, settings.PickupWhitelist))
+        {
+            return true;
+        }
+
         if (!settings.CurrencyOnly)
         {
             return PassesValueFilter(divineValue, settings, prices, itemPath);
         }
 
-        if (!IsCurrencyPickup(entity, itemPath, settings.AlwaysPickupWaystonesAndTablets))
+        if (!IsCurrencyPickup(
+                entity,
+                itemPath,
+                settings.AlwaysPickupWaystonesAndTablets,
+                settings.PickupWhitelist,
+                settings.PickupBlacklist))
         {
             return false;
         }
@@ -131,8 +156,23 @@ public static class LootPathMatcher
         return PassesValueFilter(divineValue, settings, prices, itemPath);
     }
 
-    public static bool IsCurrencyPickup(Entity entity, string? itemPath, bool alwaysPickupWaystonesAndTablets)
+    public static bool IsCurrencyPickup(
+        Entity entity,
+        string? itemPath,
+        bool alwaysPickupWaystonesAndTablets,
+        IReadOnlyList<string>? whitelist = null,
+        IReadOnlyList<string>? blacklist = null)
     {
+        if (IsGoldEntity(entity) || IsBlacklisted(entity, itemPath, blacklist))
+        {
+            return false;
+        }
+
+        if (IsWhitelisted(entity, itemPath, whitelist))
+        {
+            return true;
+        }
+
         foreach (var path in GroundLootRules.EnumerateItemPathCandidates(entity))
         {
             if (IsGoldPath(path))
@@ -169,16 +209,61 @@ public static class LootPathMatcher
             }
         }
 
-        if (IsEquipmentDrop(entity) || IsGoldEntity(entity))
+        if (IsEquipmentDrop(entity))
         {
             return false;
         }
 
-        // Currency orbs often appear as WorldItem placeholders before Animated paths resolve.
+        // Unresolved WorldItem placeholders: only stackables that are not gold/equipment.
         if (GroundLootRules.IsWorldItemPlaceholder(entity) ||
             entity.EntitySubtype is EntitySubtypes.WorldItem)
         {
-            return true;
+            return entity.TryGetComponent<Stack>(out _);
+        }
+
+        return false;
+    }
+
+    public static bool IsWhitelisted(Entity entity, string? itemPath, IReadOnlyList<string>? entries) =>
+        MatchesPathList(entity, itemPath, entries);
+
+    public static bool IsBlacklisted(Entity entity, string? itemPath, IReadOnlyList<string>? entries) =>
+        MatchesPathList(entity, itemPath, entries);
+
+    private static bool MatchesPathList(Entity entity, string? itemPath, IReadOnlyList<string>? entries)
+    {
+        if (entries is null || entries.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var entry in entries)
+        {
+            if (string.IsNullOrWhiteSpace(entry))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(itemPath) &&
+                itemPath.Contains(entry, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            foreach (var path in GroundLootRules.EnumerateItemPathCandidates(entity))
+            {
+                if (!string.IsNullOrWhiteSpace(path) &&
+                    path.Contains(entry, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            var displayName = GroundLootRules.ResolveDisplayName(entity);
+            if (displayName.Contains(entry, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
         }
 
         return false;
@@ -265,7 +350,10 @@ public static class LootPathMatcher
 
     private static bool IsCurrencyLootPath(string path) =>
         !IsGoldPath(path) &&
-        (CurrencyPathMapper.IsTrackableCurrencyPath(path) || IsLooseCurrencyPath(path));
+        !IsEquipmentPath(path) &&
+        (CurrencyPathMapper.IsTrackableCurrencyPath(path) ||
+         IsLooseCurrencyPath(path) ||
+         MatchesStackablePath(path));
 
     private static bool IsLooseCurrencyPath(string path) =>
         path.Contains("/Currency/", StringComparison.OrdinalIgnoreCase) ||

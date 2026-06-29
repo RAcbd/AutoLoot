@@ -26,7 +26,7 @@ public sealed class AutoLootPlugin : PluginBase
 
     public override string Author => "Raff";
 
-    public override string Version => "0.7.2";
+    public override string Version => "0.7.3";
 
     public override void OnEnable(bool isGameOpened)
     {
@@ -58,6 +58,10 @@ public sealed class AutoLootPlugin : PluginBase
 
         ImGui.Checkbox("Currency only", ref settings.CurrencyOnly);
         ImGui.TextDisabled("Picks up currency orbs, shards, fragments, runes, omens, and similar drops. Gold is never clicked (game auto-picks it).");
+        DrawPathListEditor("Pickup whitelist (one path fragment per line)", settings.PickupWhitelist,
+            "Always pick up items matching these path or name fragments, even with currency-only on.");
+        DrawPathListEditor("Pickup blacklist (one path fragment per line)", settings.PickupBlacklist,
+            "Never pick up items matching these fragments (overrides currency-only and whitelist).");
         ImGui.Checkbox("Always pick up waystones/tablets", ref settings.AlwaysPickupWaystonesAndTablets);
         ImGui.Checkbox("Min value filter", ref settings.UseValueFilter);
         ImGui.InputDouble("Min divine value", ref settings.MinDivineValue, 0.1, 1.0);
@@ -129,6 +133,7 @@ public sealed class AutoLootPlugin : PluginBase
         ImGui.Checkbox("Pause when panels open", ref settings.PauseWhenPanelsOpen);
         ImGui.Checkbox("Pause when chat open", ref settings.PauseWhenChatOpen);
         ImGui.DragFloat("Pickup distance", ref settings.PickupDistance, 1f, 50f, 900f);
+        ImGui.TextDisabled("Loot must be inside OriathHub inner/outer nearby circles and within this distance.");
         if (settings.PickupDistance < 120f)
         {
             ImGui.TextColored(new Vector4(0.95f, 0.55f, 0.2f, 1f),
@@ -168,6 +173,24 @@ public sealed class AutoLootPlugin : PluginBase
     }
 
     public override void SaveSettings() => JsonHelper.SaveToFile(settings, settingsFile);
+
+    private static void DrawPathListEditor(string label, List<string> list, string tooltip)
+    {
+        var buffer = string.Join('\n', list);
+        ImGui.TextUnformatted(label);
+        ImGuiHelper.ToolTip(tooltip);
+        if (ImGui.InputTextMultiline($"##{label}", ref buffer, 8192, new Vector2(-1, 52)))
+        {
+            list.Clear();
+            foreach (var line in buffer.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    list.Add(line);
+                }
+            }
+        }
+    }
 
     private IEnumerator<Wait> OnAreaChange()
     {

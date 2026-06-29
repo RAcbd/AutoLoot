@@ -278,5 +278,7 @@ internal sealed class AutoLootService
         MinDivineValue = settings.MinDivineValue,
         PickupDistance = settings.PickupDistance,
         AlwaysPickupWaystonesAndTablets = settings.AlwaysPickupWaystonesAndTablets,
+        PickupWhitelist = settings.PickupWhitelist,
+        PickupBlacklist = settings.PickupBlacklist,
     };
 }

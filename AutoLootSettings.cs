@@ -36,6 +36,12 @@ public sealed class AutoLootSettings
 
     public bool AlwaysPickupWaystonesAndTablets = true;
 
+    /// <summary>One entry per line in settings UI — matched against item paths and display names.</summary>
+    public List<string> PickupWhitelist = [];
+
+    /// <summary>One entry per line in settings UI — matched against item paths and display names.</summary>
+    public List<string> PickupBlacklist = [];
+
     public bool EnableDebugLogging;
 
     public bool ShowDebugOverlay;

@@ -74,7 +74,12 @@ public static class GroundLootScanner
             var inRange = IsInPickupRange(area, entity, settings.PickupDistance, out var distance);
             if (settings.CurrencyOnly &&
                 !(settings.AlwaysPickupWaystonesAndTablets && LootPathMatcher.IsAlwaysPickupPath(itemPath)) &&
-                !LootPathMatcher.IsCurrencyPickup(entity, itemPath, settings.AlwaysPickupWaystonesAndTablets))
+                !LootPathMatcher.IsCurrencyPickup(
+                    entity,
+                    itemPath,
+                    settings.AlwaysPickupWaystonesAndTablets,
+                    settings.PickupWhitelist,
+                    settings.PickupBlacklist))
             {
                 diagnostics.FilteredByPath++;
                 if (markers is not null && hasScreen)
@@ -415,24 +420,19 @@ public static class GroundLootScanner
         out float distance)
     {
         distance = 0f;
-        if (!entity.IsValid)
+        if (!entity.IsValid || !area.Player.IsValid)
         {
             return false;
         }
 
-        if (entity.Zones is NearbyZones.InnerCircle or NearbyZones.OuterCircle)
+        // Only loot inside the host's nearby circles (same space entity processing uses).
+        if (entity.Zones is not (NearbyZones.InnerCircle or NearbyZones.OuterCircle))
         {
-            distance = area.Player.IsValid ? entity.DistanceFrom(area.Player) : 1f;
-            return distance > 0f && distance <= pickupDistance;
-        }
-
-        var player = area.Player;
-        if (!player.IsValid)
-        {
+            distance = entity.DistanceFrom(area.Player);
             return false;
         }
 
-        distance = entity.DistanceFrom(player);
+        distance = entity.DistanceFrom(area.Player);
         return distance > 0f && distance <= pickupDistance;
     }
 }
